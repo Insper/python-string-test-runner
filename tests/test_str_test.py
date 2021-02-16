@@ -16,7 +16,7 @@ class TestCase(str_test.TestCaseWrapper):
 '''
 
 TARGET_CODE_0 = '''
-def ex1(a, b)
+df ex1(a, b):
     return max(a, b)
 '''
 
@@ -349,6 +349,17 @@ while continuar:
 print('Fim')
 '''
 
+TEST_CODE12 = '''
+from strtest import str_test as ch
+
+
+class TestCase(ch.TestCaseWrapper):
+    TIMEOUT = 2
+
+    def test_1(self):
+        self.assertEqual(7, self.function(2, 5))
+'''
+
 
 class StrTestTest(unittest.TestCase):
     def test_doesnt_break_with_syntax_error(self):
@@ -540,6 +551,98 @@ class StrTestTest(unittest.TestCase):
                           ('Continuar? ', 'sim'), ('Continuar? ', 'não'),
                           ('Fim', )], result.stdouts[0])
         self.assertEqual(1, result.total_tests)
+
+    def test_close_parens_error(self):
+        functions = [
+'''
+def add(a, b):
+    return (a + b
+''',
+'''
+def add(a, b):
+    return ((a + b)
+''',
+'''
+def add(a, b):
+    c = ((a + b)
+    return c
+''',
+'''
+def add(a, b):
+    c = (a + b
+    return c
+''',
+        ]
+
+        for function in functions:
+            result = str_test.run_tests(function, TEST_CODE12, 'add')
+            self.assertFalse(result.success)
+            self.assertEqual(result.failure_msgs[0], str_test.CLOSE_PARENTHESIS_ERROR)
+
+    def test_open_parens_error(self):
+        functions = [
+'''
+def add(a, b):
+    return a + b)
+''',
+'''
+def add(a, b):
+    return (a + b))
+''',
+'''
+def add(a, b):
+    c = (a + b))
+    return c
+''',
+'''
+def add(a, b):
+    c = a + b)
+    return c
+''',
+        ]
+
+        for function in functions:
+            result = str_test.run_tests(function, TEST_CODE12, 'add')
+            self.assertFalse(result.success)
+            self.assertEqual(result.failure_msgs[0], str_test.OPEN_PARENTHESIS_ERROR)
+
+    def test_def_colon_error(self):
+        result = str_test.run_tests('''
+def add(a, b)
+    return a + b
+        ''', TEST_CODE12, 'add')
+        self.assertFalse(result.success)
+        self.assertEqual(result.failure_msgs[0], str_test.DEF_COLON_ERROR)
+
+    def test_if_colon_error(self):
+        result = str_test.run_tests('''
+def add(a, b):
+    if a > b
+        d = a + b
+    return a + b
+        ''', TEST_CODE12, 'add')
+        self.assertFalse(result.success)
+        self.assertEqual(result.failure_msgs[0], str_test.IF_COLON_ERROR)
+
+    def test_while_colon_error(self):
+        result = str_test.run_tests('''
+def add(a, b):
+    while False
+        d = a + b
+    return a + b
+        ''', TEST_CODE12, 'add')
+        self.assertFalse(result.success)
+        self.assertEqual(result.failure_msgs[0], str_test.WHILE_COLON_ERROR)
+
+    def test_for_colon_error(self):
+        result = str_test.run_tests('''
+def add(a, b):
+    for i in range(5)
+        d = a + b
+    return a + b
+        ''', TEST_CODE12, 'add')
+        self.assertFalse(result.success)
+        self.assertEqual(result.failure_msgs[0], str_test.FOR_COLON_ERROR)
 
 
 class TestCaseWrapperTest(unittest.TestCase):

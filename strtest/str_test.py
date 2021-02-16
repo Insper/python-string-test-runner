@@ -18,6 +18,13 @@ START_SEP = '<|><'
 END_SEP = '><|>'
 TIME_LIMIT_EXCEEDED = 'Tempo limite excedido'
 SYNTAX_ERROR = 'Erro de sintaxe (código Python inválido)'
+CLOSE_PARENTHESIS_ERROR = 'Erro de parênteses (faltou fechar um parênteses)'
+OPEN_PARENTHESIS_ERROR = 'Erro de parênteses (faltou abrir um parênteses)'
+IF_COLON_ERROR = 'Erro de sintaxe (faltou : na linha do if)'
+WHILE_COLON_ERROR = 'Erro de sintaxe (faltou : na linha do while)'
+FOR_COLON_ERROR = 'Erro de sintaxe (faltou : na linha do for)'
+DEF_COLON_ERROR = 'Erro de sintaxe (faltou : na linha do def)'
+
 DEFAULT_MSG = 'Não funcionou para algum teste'
 FILE_STR = 'File "<string>", '
 
@@ -66,16 +73,52 @@ def run_tests(target_code, test_code, func_name):
         success = result.wasSuccessful()
         for failure in result.failures + result.errors:
             st = failure[1]
+
             fm = get_message(failure[0])
             stdout = get_stdout(failure[0])
             if START_SEP in st and END_SEP in st:
                 fm = st[st.find(START_SEP) + len(START_SEP):st.find(END_SEP)]
             elif 'TimeoutError' in st:
                 fm = TIME_LIMIT_EXCEEDED
-            elif 'SyntaxError: invalid syntax' in st:
+            elif 'SyntaxError' in st:
                 fm = SYNTAX_ERROR
                 if FILE_STR in st:
                     st = st[st.rindex(FILE_STR) + len(FILE_STR):]
+
+                code_lines = target_code.split('\n')
+                error_line_no = int(st[st.rindex('line') + 4:].split('\n')[0].strip())
+                error_line = code_lines[error_line_no - 1].strip()
+                prev_error_line = ''
+                if error_line_no > 1:
+                    prev_error_line = code_lines[error_line_no - 2].strip()
+                lines_with_error = prev_error_line + '\n' + error_line
+
+                found_error = False
+                if "(" in lines_with_error or ")" in lines_with_error:
+                    open_parens = lines_with_error.count('(')
+                    close_parens = lines_with_error.count(')')
+                    if open_parens > close_parens:
+                        fm = CLOSE_PARENTHESIS_ERROR
+                        found_error = True
+                    elif open_parens < close_parens:
+                        fm = OPEN_PARENTHESIS_ERROR
+                        found_error = True
+
+                if not found_error:
+                    for line in [prev_error_line, error_line]:
+                        if any(line.startswith(cmd) for cmd in ('if ', 'while ', 'def ', 'for ')) and ":" not in line:
+                            found_error = True
+                            if "if " in line:
+                                fm = IF_COLON_ERROR
+                            elif "while " in line:
+                                fm = WHILE_COLON_ERROR
+                            elif "for " in line:
+                                fm = FOR_COLON_ERROR
+                            elif "def " in line:
+                                fm = DEF_COLON_ERROR
+                            else:
+                                found_error = False
+
             if 'PriorityError' in st:
                 st = st[st.rindex('PriorityError'):st.index(START_SEP)]
             if (fm, st) not in msgs:
